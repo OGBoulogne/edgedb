@@ -1299,6 +1299,13 @@ cdef class EdgeConnection:
         if not eql:
             raise errors.BinaryProtocolError('empty query')
 
+        type_id = self.buffer.read_bytes(16)
+        assert self.buffer.read_int16() == 1
+        type_data = self.buffer.read_len_prefixed_bytes()
+        self.get_dbview().decode_state(
+            type_id, type_data, self.protocol_version
+        )
+
         source = self._tokenize(eql)
 
         query_req = QueryRequestInfo(
@@ -1443,6 +1450,14 @@ cdef class EdgeConnection:
         msg.write_int64(<int64_t><uint64_t>query_unit.capabilities)
 
         msg.write_len_prefixed_bytes(query_unit.status)
+
+        type_id, data = self.get_dbview().encode_state(
+            self.protocol_version
+        )
+        msg.write_bytes(type_id.bytes)
+        msg.write_int16(1)
+        msg.write_len_prefixed_bytes(data)
+
         return msg.end_message()
 
     cdef WriteBuffer make_command_complete_msg_by_group(
