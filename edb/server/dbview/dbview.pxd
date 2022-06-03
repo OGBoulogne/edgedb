@@ -36,6 +36,7 @@ cdef class DatabaseIndex:
         object _comp_sys_config
         object _std_schema
         object _global_schema
+        object _factory
 
 
 cdef class Database:
@@ -44,6 +45,7 @@ cdef class Database:
         object _eql_to_compiled
         DatabaseIndex _index
         object _views
+        object _state_serializers
 
         readonly str name
         readonly object dbver
@@ -67,6 +69,8 @@ cdef class Database:
         backend_ids=?,
         db_config=?,
     )
+    cdef get_state_serializer(self, protocol_version)
+
 
 cdef class DatabaseConnectionView:
 
@@ -150,3 +154,4 @@ cdef class DatabaseConnectionView:
     cpdef get_modaliases(self)
 
     cdef bytes serialize_state(self)
+    cdef describe_state(self, protocol_version)

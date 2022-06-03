@@ -176,6 +176,8 @@ cdef class EdgeConnection:
 
     cdef uint64_t _parse_implicit_limit(self, bytes v) except <uint64_t>-1
 
+    cdef bytes _describe_state(self)
+
 \
 @cython.final
 cdef class VirtualTransport:

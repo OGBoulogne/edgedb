@@ -30,7 +30,7 @@ from edb.common import lru, uuidgen
 from edb.schema import extensions as s_ext
 from edb.schema import schema as s_schema
 from edb.server import defines, config
-from edb.server.compiler import dbstate
+from edb.server.compiler import dbstate, sertypes
 from edb.pgsql import dbops
 
 
@@ -72,6 +72,7 @@ cdef class Database:
 
         self._index = index
         self._views = weakref.WeakSet()
+        self._state_serializers = {}
 
         self._eql_to_compiled = lru.LRUMapping(
             maxsize=defines._MAX_QUERIES_CACHE)
@@ -120,6 +121,7 @@ cdef class Database:
 
     cdef _invalidate_caches(self):
         self._eql_to_compiled.clear()
+        self._state_serializers.clear()
 
     cdef _cache_compiled_query(self, key, compiled: dbstate.QueryUnitGroup):
         assert compiled.cacheable
@@ -138,6 +140,15 @@ cdef class Database:
 
     cdef _remove_view(self, view):
         self._views.remove(view)
+
+    cdef get_state_serializer(self, protocol_version):
+        if protocol_version not in self._state_serializers:
+            self._state_serializers[protocol_version] = self._index._factory.make(
+                self.user_schema,
+                self._index._global_schema,
+                protocol_version,
+            )
+        return self._state_serializers[protocol_version]
 
     def iter_views(self):
         yield from self._views
@@ -382,6 +393,9 @@ cdef class DatabaseConnectionView:
         spec = json.dumps(state).encode('utf-8')
         self._session_state_cache = (self._config, spec)
         return spec
+
+    cdef describe_state(self, protocol_version):
+        return self._db.get_state_serializer(protocol_version).describe()
 
     property txid:
         def __get__(self):
@@ -645,6 +659,7 @@ cdef class DatabaseIndex:
         self._std_schema = std_schema
         self._global_schema = global_schema
         self.update_sys_config(sys_config)
+        self._factory = sertypes.StateSerializerFactory(std_schema)
 
     def count_connections(self, dbname: str):
         try:
